@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>YouTube Live</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+  </head>
+  <body>
+    <main>
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">STREAM ARCHIVE</p>
+          <h1>YouTube Live</h1>
+        </div>
+        <a class="refresh" href="/">Refresh</a>
+      </header>
+
+      {% if is_stale %}
+        <p class="warning" role="status">
+          YouTube is temporarily unavailable. Showing the last successful update.
+        </p>
+      {% endif %}
+
+      {% if not groups.active and not groups.upcoming and not groups.completed %}
+        <section class="empty-state">
+          <h2>No streams yet</h2>
+          <p>New live broadcasts will appear here.</p>
+        </section>
+      {% endif %}
+
+      {% for status, heading in [('active', 'Live now'), ('upcoming', 'Coming up'), ('completed', 'Recent streams')] %}
+        {% if groups[status] %}
+          <section class="stream-section">
+            <h2>{{ heading }}</h2>
+            <div class="stream-grid">
+              {% for broadcast in groups[status] %}
+                <a class="stream-card" href="{{ broadcast.watch_url }}" target="_blank" rel="noreferrer">
+                  <div class="thumbnail">
+                    {% if broadcast.thumbnail_url %}
+                      <img src="{{ broadcast.thumbnail_url }}" alt="" loading="lazy">
+                    {% else %}
+                      <div class="thumbnail-placeholder">▶</div>
+                    {% endif %}
+                    <span class="badge badge-{{ status }}">{{ 'LIVE' if status == 'active' else status|upper }}</span>
+                  </div>
+                  <div class="stream-details">
+                    <h3>{{ broadcast.title }}</h3>
+                    <time datetime="{{ broadcast.starts_at.isoformat() }}">
+                      {{ broadcast.starts_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                    </time>
+                  </div>
+                </a>
+              {% endfor %}
+            </div>
+          </section>
+        {% endif %}
+      {% endfor %}
+    </main>
+    <script>
+      for (const element of document.querySelectorAll('time[datetime]')) {
+        const value = new Date(element.dateTime);
+        element.textContent = new Intl.DateTimeFormat(undefined, {
+          dateStyle: 'medium',
+          timeStyle: 'short'
+        }).format(value);
+      }
+    </script>
+  </body>
+</html>

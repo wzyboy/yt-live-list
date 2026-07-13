@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+.pytest_cache/
+dist/
+*.py[cod]
+client_secret*.json
+data/
