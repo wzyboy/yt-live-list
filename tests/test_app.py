@@ -43,6 +43,8 @@ def test_index_renders_broadcast(sample_broadcast: Broadcast) -> None:
     assert 'Game night' in response.text
     assert 'https://www.youtube.com/watch?v=abc123' in response.text
     assert 'Live now' in response.text
+    assert 'href="./static/style.css"' in response.text
+    assert 'class="refresh" href="./"' in response.text
 
 
 def test_index_renders_empty_state() -> None:
