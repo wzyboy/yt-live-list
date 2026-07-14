@@ -1,12 +1,11 @@
 import logging
-from collections.abc import Callable
-from dataclasses import dataclass
-from threading import Lock
 from time import monotonic
+from threading import Lock
+from dataclasses import dataclass
+from collections.abc import Callable
 
 from yt_live_list.models import Broadcast
 from yt_live_list.youtube import YouTubeError
-
 
 LOGGER = logging.getLogger(__name__)
 

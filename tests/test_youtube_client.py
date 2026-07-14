@@ -2,9 +2,11 @@ import json
 from typing import Any
 
 import pytest
-from requests import HTTPError, Response
+from requests import Response
+from requests import HTTPError
 
-from yt_live_list.youtube import YouTubeClient, YouTubeError
+from yt_live_list.youtube import YouTubeError
+from yt_live_list.youtube import YouTubeClient
 
 
 class FakeResponse:
