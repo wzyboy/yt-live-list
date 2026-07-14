@@ -4,11 +4,14 @@ from pathlib import Path
 from datetime import UTC
 from datetime import datetime
 from collections.abc import Mapping
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 
 from requests import Response
 from requests import RequestException
 from google.auth.exceptions import GoogleAuthError
 from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.auth.transport.requests import AuthorizedSession
 
 from yt_live_list.models import Broadcast
@@ -16,6 +19,8 @@ from yt_live_list.models import BroadcastStatus
 
 YOUTUBE_READONLY_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly'
 LIVE_BROADCASTS_URL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts'
+HISTORY_LIMIT = 20
+PAGE_SIZE = 50
 
 
 class ConfigurationError(RuntimeError):
@@ -45,54 +50,111 @@ class YouTubeClient:
                 f'Could not load YouTube token file: {token_file}'
             ) from error
 
-        self._session = AuthorizedSession(credentials)
+        self._credentials = credentials
+        self._session_factory: Callable[[], AuthorizedSession] = lambda: (
+            AuthorizedSession(self._credentials)
+        )
         self._timeout_seconds = timeout_seconds
 
     def list_broadcasts(self) -> list[Broadcast]:
-        items: list[Mapping[str, Any]] = []
+        self._ensure_credentials_valid()
+        limits: dict[BroadcastStatus, int | None] = {
+            'active': None,
+            'upcoming': None,
+            'completed': HISTORY_LIMIT,
+        }
+
+        with ThreadPoolExecutor(
+            max_workers=len(limits),
+            thread_name_prefix='youtube-broadcasts',
+        ) as executor:
+            futures = {
+                status: executor.submit(self._list_status, status, limit)
+                for status, limit in limits.items()
+            }
+            try:
+                groups = {
+                    status: future.result() for status, future in futures.items()
+                }
+            except Exception:
+                for future in futures.values():
+                    future.cancel()
+                raise
+
+        return sort_and_limit_broadcasts(
+            [*groups['active'], *groups['upcoming'], *groups['completed']]
+        )
+
+    def _ensure_credentials_valid(self) -> None:
+        if self._credentials.valid:
+            return
+        try:
+            self._credentials.refresh(GoogleAuthRequest())
+        except GoogleAuthError as error:
+            raise YouTubeError('YouTube authentication failed') from error
+
+    def _list_status(
+        self,
+        broadcast_status: BroadcastStatus,
+        result_limit: int | None,
+    ) -> list[Broadcast]:
+        broadcasts: list[Broadcast] = []
         page_token: str | None = None
         seen_page_tokens: set[str] = set()
+        session = self._session_factory()
 
-        while True:
-            parameters = {
-                'part': 'id,snippet,status',
-                'broadcastStatus': 'all',
-                'broadcastType': 'all',
-                'maxResults': 50,
-            }
-            if page_token is not None:
-                parameters['pageToken'] = page_token
+        try:
+            while True:
+                parameters = {
+                    'part': 'id,snippet,status',
+                    'broadcastStatus': broadcast_status,
+                    'broadcastType': 'all',
+                    'maxResults': result_limit or PAGE_SIZE,
+                }
+                if page_token is not None:
+                    parameters['pageToken'] = page_token
 
-            try:
-                response = self._session.get(
+                response = session.get(
                     LIVE_BROADCASTS_URL,
                     params=parameters,
                     timeout=self._timeout_seconds,
                 )
                 response.raise_for_status()
                 payload = response.json()
-            except RequestException as error:
-                if error.response is not None:
-                    raise _http_error(error.response) from error
-                raise YouTubeError('YouTube API request failed') from error
-            except (GoogleAuthError, ValueError) as error:
-                raise YouTubeError('YouTube API request failed') from error
+                if not isinstance(payload, dict) or not isinstance(
+                    payload.get('items'), list
+                ):
+                    raise YouTubeError('YouTube API returned an invalid response')
 
-            if not isinstance(payload, dict) or not isinstance(payload.get('items'), list):
-                raise YouTubeError('YouTube API returned an invalid response')
+                for item in payload['items']:
+                    if not isinstance(item, dict):
+                        continue
+                    broadcast = parse_broadcast(item)
+                    if broadcast is not None and broadcast.status == broadcast_status:
+                        broadcasts.append(broadcast)
 
-            items.extend(item for item in payload['items'] if isinstance(item, dict))
-            next_page_token = payload.get('nextPageToken')
-            if next_page_token is None:
-                break
-            if not isinstance(next_page_token, str) or next_page_token in seen_page_tokens:
-                raise YouTubeError('YouTube API returned an invalid page token')
+                if result_limit is not None and len(broadcasts) >= result_limit:
+                    return broadcasts[:result_limit]
 
-            seen_page_tokens.add(next_page_token)
-            page_token = next_page_token
+                next_page_token = payload.get('nextPageToken')
+                if next_page_token is None:
+                    return broadcasts
+                if (
+                    not isinstance(next_page_token, str)
+                    or next_page_token in seen_page_tokens
+                ):
+                    raise YouTubeError('YouTube API returned an invalid page token')
 
-        broadcasts = [broadcast for item in items if (broadcast := parse_broadcast(item))]
-        return sort_and_limit_broadcasts(broadcasts)
+                seen_page_tokens.add(next_page_token)
+                page_token = next_page_token
+        except RequestException as error:
+            if error.response is not None:
+                raise _http_error(error.response) from error
+            raise YouTubeError('YouTube API request failed') from error
+        except (GoogleAuthError, ValueError) as error:
+            raise YouTubeError('YouTube API request failed') from error
+        finally:
+            session.close()
 
 
 def parse_broadcast(item: Mapping[str, Any]) -> Broadcast | None:
