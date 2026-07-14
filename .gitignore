@@ -2,6 +2,7 @@
 __pycache__/
 .pytest_cache/
 dist/
+.env
 *.py[cod]
 client_secret*.json
 data/
