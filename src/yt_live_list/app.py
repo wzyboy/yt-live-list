@@ -1,6 +1,7 @@
 import os
 import logging
 from pathlib import Path
+from datetime import timedelta
 
 from fastapi import FastAPI
 from fastapi import Request
@@ -35,6 +36,7 @@ def create_app(
 
     app = FastAPI(title='YouTube Live List')
     templates = Jinja2Templates(directory=PACKAGE_DIR / 'templates')
+    templates.env.filters['format_duration'] = format_duration
     cache = BroadcastCache(source.list_broadcasts, cache_ttl_seconds)
     app.mount('/static', StaticFiles(directory=PACKAGE_DIR / 'static'), name='static')
 
@@ -57,7 +59,11 @@ def create_app(
         return templates.TemplateResponse(
             request=request,
             name='index.html',
-            context={'groups': groups, 'is_stale': result.is_stale},
+            context={
+                'groups': groups,
+                'is_stale': result.is_stale,
+                'cached_at': result.cached_at,
+            },
         )
 
     @app.get('/healthz')
@@ -73,3 +79,19 @@ def _cache_ttl_from_environment() -> float:
         return float(raw_value)
     except ValueError as error:
         raise ConfigurationError('YTLL_CACHE_TTL_SECONDS must be a number') from error
+
+
+def format_duration(duration: timedelta) -> str:
+    total_minutes = int(duration.total_seconds() // 60)
+    if total_minutes < 1:
+        return '<1m'
+    days, remaining_minutes = divmod(total_minutes, 24 * 60)
+    hours, minutes = divmod(remaining_minutes, 60)
+    parts = []
+    if days:
+        parts.append(f'{days}d')
+    if hours:
+        parts.append(f'{hours}h')
+    if minutes or not parts:
+        parts.append(f'{minutes}m')
+    return ' '.join(parts)

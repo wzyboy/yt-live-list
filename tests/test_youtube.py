@@ -37,6 +37,21 @@ def test_parse_unlisted_live_broadcast() -> None:
     assert broadcast.starts_at == datetime(2026, 7, 13, 18, tzinfo=UTC)
 
 
+def test_parse_completed_broadcast_duration() -> None:
+    item = api_item(life_cycle_status='complete')
+    snippet = item['snippet']
+    assert isinstance(snippet, dict)
+    snippet['actualEndTime'] = '2026-07-13T20:30:00Z'
+
+    broadcast = parse_broadcast(item)
+
+    assert broadcast is not None
+    assert broadcast.ends_at == datetime(2026, 7, 13, 20, 30, tzinfo=UTC)
+    assert broadcast.duration_at(datetime(2030, 1, 1, tzinfo=UTC)) == timedelta(
+        hours=2, minutes=30
+    )
+
+
 def test_parse_excludes_private_and_malformed_broadcasts() -> None:
     assert parse_broadcast(api_item(privacy_status='private')) is None
     assert parse_broadcast({'id': 'missing-fields'}) is None

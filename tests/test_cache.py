@@ -1,3 +1,6 @@
+from datetime import UTC
+from datetime import datetime
+
 import pytest
 
 from yt_live_list.cache import BroadcastCache
@@ -22,11 +25,19 @@ def test_cache_reuses_fresh_result(sample_broadcast: Broadcast) -> None:
         return [sample_broadcast]
 
     clock = Clock()
-    cache = BroadcastCache(load, ttl_seconds=60, clock=clock)
+    cached_at = datetime(2026, 7, 13, 20, tzinfo=UTC)
+    cache = BroadcastCache(
+        load,
+        ttl_seconds=60,
+        clock=clock,
+        wall_clock=lambda: cached_at,
+    )
 
-    assert cache.get().broadcasts == [sample_broadcast]
+    first_result = cache.get()
+    assert first_result.broadcasts == [sample_broadcast]
+    assert first_result.cached_at == cached_at
     clock.now = 59
-    assert cache.get().broadcasts == [sample_broadcast]
+    assert cache.get().cached_at == cached_at
     assert calls == 1
 
 
@@ -39,7 +50,13 @@ def test_cache_serves_stale_result_after_error(sample_broadcast: Broadcast) -> N
         return [sample_broadcast]
 
     clock = Clock()
-    cache = BroadcastCache(load, ttl_seconds=60, clock=clock)
+    cached_at = datetime(2026, 7, 13, 20, tzinfo=UTC)
+    cache = BroadcastCache(
+        load,
+        ttl_seconds=60,
+        clock=clock,
+        wall_clock=lambda: cached_at,
+    )
     cache.get()
     should_fail = True
     clock.now = 61
@@ -48,6 +65,7 @@ def test_cache_serves_stale_result_after_error(sample_broadcast: Broadcast) -> N
 
     assert result.broadcasts == [sample_broadcast]
     assert result.is_stale is True
+    assert result.cached_at == cached_at
 
 
 def test_cache_raises_initial_error() -> None:

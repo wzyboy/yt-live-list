@@ -30,6 +30,14 @@ main {
   margin-bottom: 3rem;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.cache-time { white-space: nowrap; }
+
 .eyebrow {
   margin: 0 0 0.4rem;
   color: #ff4167;
@@ -97,6 +105,8 @@ h3 { margin-bottom: 0.55rem; font-size: 1rem; line-height: 1.35; }
 .badge-upcoming { background: #3452d1; }
 .stream-details { padding: 1rem; }
 time { color: #94949f; font-size: 0.82rem; }
+.stream-time { display: flex; align-items: center; gap: 0.35rem; color: #94949f; font-size: 0.82rem; }
+.duration[title] { cursor: help; text-decoration: underline dotted; text-underline-offset: 0.2rem; }
 
 .empty-state {
   padding: clamp(2rem, 8vw, 5rem);
@@ -112,4 +122,5 @@ time { color: #94949f; font-size: 0.82rem; }
 @media (max-width: 520px) {
   main { padding-top: 2rem; }
   .page-header { align-items: center; margin-bottom: 2rem; }
+  .header-actions { align-items: end; flex-direction: column-reverse; gap: 0.5rem; }
 }

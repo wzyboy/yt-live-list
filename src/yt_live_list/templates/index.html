@@ -13,7 +13,12 @@
           <p class="eyebrow">STREAM ARCHIVE</p>
           <h1>YouTube Live</h1>
         </div>
-        <a class="refresh" href="./">Refresh</a>
+        <div class="header-actions">
+          <time class="cache-time" datetime="{{ cached_at.isoformat() }}">
+            Cached {{ cached_at.strftime('%Y-%m-%d %H:%M UTC') }}
+          </time>
+          <a class="refresh" href="./">Refresh</a>
+        </div>
       </header>
 
       {% if is_stale %}
@@ -46,9 +51,22 @@
                   </div>
                   <div class="stream-details">
                     <h3>{{ broadcast.title }}</h3>
-                    <time datetime="{{ broadcast.starts_at.isoformat() }}">
-                      {{ broadcast.starts_at.strftime('%Y-%m-%d %H:%M UTC') }}
-                    </time>
+                    <div class="stream-time">
+                      <time class="local-time" datetime="{{ broadcast.starts_at.isoformat() }}">
+                        {{ broadcast.starts_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                      </time>
+                      {% set duration = broadcast.duration_at(cached_at) %}
+                      {% if duration is not none %}
+                        <span aria-hidden="true">·</span>
+                        <span
+                          class="duration"
+                          {% if broadcast.ends_at %}
+                            data-end-time="{{ broadcast.ends_at.isoformat() }}"
+                            title="Ended {{ broadcast.ends_at.strftime('%Y-%m-%d %H:%M UTC') }}"
+                          {% endif %}
+                        >{{ duration|format_duration }}</span>
+                      {% endif %}
+                    </div>
                   </div>
                 </a>
               {% endfor %}
@@ -58,13 +76,25 @@
       {% endfor %}
     </main>
     <script>
-      for (const element of document.querySelectorAll('time[datetime]')) {
+      const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      });
+      for (const element of document.querySelectorAll('time.local-time')) {
         const value = new Date(element.dateTime);
-        element.textContent = new Intl.DateTimeFormat(undefined, {
-          dateStyle: 'medium',
-          timeStyle: 'short'
-        }).format(value);
+        element.textContent = dateTimeFormatter.format(value);
       }
+      for (const element of document.querySelectorAll('[data-end-time]')) {
+        element.title = `Ended ${dateTimeFormatter.format(new Date(element.dataset.endTime))}`;
+      }
+      const cacheTime = document.querySelector('time.cache-time');
+      const cachedAt = new Date(cacheTime.dateTime);
+      const cachedSecondsAgo = Math.max(0, Math.floor((Date.now() - cachedAt) / 1000));
+      const cachedMinutesAgo = Math.floor(cachedSecondsAgo / 60);
+      cacheTime.textContent = cachedMinutesAgo < 1
+        ? 'Cached just now'
+        : `Cached ${cachedMinutesAgo}m ago`;
+      cacheTime.title = dateTimeFormatter.format(cachedAt);
     </script>
   </body>
 </html>

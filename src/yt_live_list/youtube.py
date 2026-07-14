@@ -136,6 +136,7 @@ def parse_broadcast(item: Mapping[str, Any]) -> Broadcast | None:
         starts_at=starts_at,
         thumbnail_url=_thumbnail_url(snippet.get('thumbnails')),
         privacy_status=privacy_status,
+        ends_at=_parse_datetime(snippet.get('actualEndTime')),
     )
 
 
