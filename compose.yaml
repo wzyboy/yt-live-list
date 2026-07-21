@@ -10,6 +10,7 @@ services:
     environment:
       YTLL_TOKEN_FILE: /run/secrets/youtube_token
       YTLL_CACHE_TTL_SECONDS: '${YTLL_CACHE_TTL_SECONDS:-60}'
+      YTLL_PUBLIC_BASE_URL: '${YTLL_PUBLIC_BASE_URL:-}'
     secrets:
       - youtube_token
     healthcheck:

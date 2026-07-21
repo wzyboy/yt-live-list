@@ -43,6 +43,12 @@ The optional `YTLL_CACHE_TTL_SECONDS` setting defaults to `60`. Results are
 cached only in memory; after an upstream failure, the last successful result is
 shown with a warning until YouTube becomes available again.
 
+The page includes a stable social preview image rather than allowing link-preview
+crawlers to choose one of the broadcast thumbnails. When the app is served below
+a reverse-proxy subpath, set `YTLL_PUBLIC_BASE_URL` to its public base URL, such as
+`https://example.com/yt-live-list`, so the Open Graph image has the correct
+absolute URL.
+
 The application intentionally has no viewer authentication. An obscure hostname
 reduces accidental discovery but is not access control: anyone who learns the
 page URL can see and share its unlisted YouTube links. Put authentication in a

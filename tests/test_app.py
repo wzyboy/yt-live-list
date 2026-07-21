@@ -4,6 +4,7 @@ from datetime import datetime
 from datetime import timedelta
 
 import httpx
+import pytest
 from fastapi import FastAPI
 
 from yt_live_list.app import create_app
@@ -50,6 +51,29 @@ def test_index_renders_broadcast(sample_broadcast: Broadcast) -> None:
     assert 'href="./static/style.css"' in response.text
     assert 'class="refresh" href="./"' in response.text
     assert 'class="cache-time"' in response.text
+    assert '<meta property="og:title" content="YouTube Live">' in response.text
+    assert (
+        '<meta property="og:image" '
+        'content="http://testserver/static/social-preview.png">'
+    ) in response.text
+    assert '<meta name="twitter:card" content="summary_large_image">' in response.text
+
+
+def test_social_preview_uses_public_base_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        'YTLL_PUBLIC_BASE_URL',
+        'https://example.com/yt-live-list/',
+    )
+    app = create_app(source=FakeSource(), cache_ttl_seconds=60)
+
+    response = request(app, '/')
+
+    assert (
+        '<meta property="og:image" '
+        'content="https://example.com/yt-live-list/static/social-preview.png">'
+    ) in response.text
 
 
 def test_index_renders_duration_and_end_time() -> None:
