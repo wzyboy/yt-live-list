@@ -63,6 +63,7 @@ def create_app(
                 'groups': groups,
                 'is_stale': result.is_stale,
                 'cached_at': result.cached_at,
+                'social_preview_url': _social_preview_url(request),
             },
         )
 
@@ -79,6 +80,13 @@ def _cache_ttl_from_environment() -> float:
         return float(raw_value)
     except ValueError as error:
         raise ConfigurationError('YTLL_CACHE_TTL_SECONDS must be a number') from error
+
+
+def _social_preview_url(request: Request) -> str:
+    public_base_url = os.environ.get('YTLL_PUBLIC_BASE_URL')
+    if public_base_url:
+        return f'{public_base_url.rstrip('/')}/static/social-preview.png'
+    return str(request.url_for('static', path='social-preview.png'))
 
 
 def format_duration(duration: timedelta) -> str:
